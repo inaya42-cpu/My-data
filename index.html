@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Data | Aesthetic Subject Manager</title>
+    <!-- 
+        Project: My Data (Aesthetic Subject Vault)
+        Description: A clean, pastel-themed file manager with individual subject folders and storage tracking.
+        Tech: HTML5, TailwindCSS, Iconify, JavaScript (ES6+)
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #fdf6f0;
+            scroll-behavior: smooth;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .folder-card {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .folder-card:hover {
+            transform: translateY(-8px) scale(1.02);
+        }
+
+        .floating-btn {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .toast {
+            transition: all 0.3s ease;
+            transform: translateY(100px);
+            opacity: 0;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal-overlay {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+        }
+
+        .active-filter {
+            ring: 3px;
+            ring-offset: 2px;
+        }
+
+        .filter-btn {
+            transition: all 0.2s ease;
+        }
+
+        .file-row:hover .file-actions {
+            opacity: 1;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-gray-700 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- Hidden File Input -->
+    <input type="file" id="real-file-input" class="hidden" onchange="handleFileSelection(event)">
+
+    <main class="flex-1 p-6 md:p-12 main-container w-full">
+        <!-- Header Section -->
+        <header class="flex justify-between items-center mb-12">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-pink-300 rounded-2xl flex items-center justify-center shadow-md shadow-pink-100">
+                    <img src="https://api.iconify.design/solar/heart-bold.svg?color=white" class="w-7 h-7" alt="Logo Icon" />
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-pink-500">My Data</h1>
+                    <p class="text-xs text-pink-300 font-semibold uppercase tracking-widest">Personal Vault</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button onclick="showToast('Searching system...')" class="p-3 bg-white rounded-2xl shadow-sm border border-pink-50 hover:bg-pink-50 transition active:scale-95">
+                    <img src="https://api.iconify.design/solar/magnifer-linear.svg" class="w-6 h-6 text-pink-300" />
+                </button>
+                <div class="relative group cursor-pointer">
+                    <img src="https://picsum.photos/48" class="w-12 h-12 rounded-2xl border-2 border-white shadow-lg" onclick="showToast('Profile settings')" />
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Grid (Folders) -->
+        <section id="subjects-grid">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="text-xl font-bold text-gray-800">Subject Hub</h3>
+                <span id="folder-count-badge" class="px-4 py-1 bg-white rounded-full text-xs font-bold text-pink-400 border border-pink-100">0 Folders</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="folder-container">
+                <!-- Folder Cards Injected by JS -->
+            </div>
+        </section>
+
+        <!-- File Preview Section (Folder Detail View) -->
+        <section id="file-preview-section" class="hidden mt-4 transition-all duration-500">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-4">
+                    <button onclick="closeFolder()" class="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 transition active:scale-90">
+                        <img src="https://api.iconify.design/solar/arrow-left-bold.svg" class="w-5 h-5 text-gray-400" />
+                    </button>
+                    <div>
+                        <h3 id="active-folder-title" class="text-2xl font-bold text-gray-800 tracking-tight">Subject Name</h3>
+                        <p id="active-folder-usage" class="text-xs font-bold text-pink-400">0 MB used</p>
+                    </div>
+                </div>
+                <button onclick="deleteActiveFolder()" class="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-100 transition active:scale-90">
+                    <img src="https://api.iconify.design/solar/trash-bin-trash-bold.svg" class="w-5 h-5" />
+                </button>
+            </div>
+
+            <!-- Quick Type Filters -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+                <div onclick="setFilter('All')" id="filter-All" class="filter-btn p-4 rounded-3xl bg-white border border-gray-100 flex flex-col items-center gap-2 hover:shadow-md transition cursor-pointer active:scale-95">
+                    <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <img src="https://api.iconify.design/solar/list-bold.svg?color=%234b5563" class="w-5 h-5" />
+                    </div>
+                    <span class="font-bold text-xs text-gray-600">All Items</span>
+                </div>
+                <div onclick="setFilter('Images')" id="filter-Images" class="filter-btn p-4 rounded-3xl bg-white border border-blue-100 flex flex-col items-center gap-2 hover:shadow-md transition cursor-pointer active:scale-95">
+                    <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <img src="https://api.iconify.design/solar/gallery-bold.svg?color=%231d4ed8" class="w-5 h-5" />
+                    </div>
+                    <span class="font-bold text-xs text-blue-700">Images</span>
+                </div>
+                <div onclick="setFilter('Files')" id="filter-Files" class="filter-btn p-4 rounded-3xl bg-white border border-green-100 flex flex-col items-center gap-2 hover:shadow-md transition cursor-pointer active:scale-95">
+                    <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                        <img src="https://api.iconify.design/solar/document-text-bold.svg?color=%2315803d" class="w-5 h-5" />
+                    </div>
+                    <span class="font-bold text-xs text-green-700">Files</span>
+                </div>
+                <div onclick="setFilter('Videos')" id="filter-Videos" class="filter-btn p-4 rounded-3xl bg-white border border-purple-100 flex flex-col items-center gap-2 hover:shadow-md transition cursor-pointer active:scale-95">
+                    <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <img src="https://api.iconify.design/solar/videocamera-record-bold.svg?color=%237e22ce" class="w-5 h-5" />
+                    </div>
+                    <span class="font-bold text-xs text-purple-700">Videos</span>
+                </div>
+                <div onclick="setFilter('Voices')" id="filter-Voices" class="filter-btn p-4 rounded-3xl bg-white border border-orange-100 flex flex-col items-center gap-2 hover:shadow-md transition cursor-pointer active:scale-95">
+                    <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                        <img src="https://api.iconify.design/solar/microphone-3-bold.svg?color=%23c2410c" class="w-5 h-5" />
+                    </div>
+                    <span class="font-bold text-xs text-orange-700">Voices</span>
+                </div>
+            </div>
+
+            <!-- File Explorer List -->
+            <div class="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-pink-50">
+                <div class="flex justify-between items-center mb-6">
+                    <h4 class="font-bold text-lg text-gray-800">File Explorer</h4>
+                    <button onclick="openUploadSelector()" class="px-6 py-3 bg-pink-500 text-white rounded-2xl text-sm font-bold shadow-lg shadow-pink-200 hover:bg-pink-600 transition active:scale-95">
+                        Add Media
+                    </button>
+                </div>
+                <div id="activity-list" class="space-y-4"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Unified Footer with Global Storage Tracker -->
+    <footer class="main-container w-full p-6 md:px-12 mb-10">
+        <div class="bg-white/70 backdrop-blur-md rounded-[2rem] p-6 border border-white flex flex-col md:flex-row items-center gap-6 justify-between shadow-sm">
+            <div class="flex items-center gap-4 w-full md:w-2/3">
+                <div class="p-3 bg-pink-100 rounded-2xl">
+                    <img src="https://api.iconify.design/solar/database-bold.svg?color=%23ec4899" class="w-6 h-6" />
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-bold text-pink-600">Global Storage Usage</span>
+                        <span id="global-storage-text" class="text-xs font-semibold text-pink-400 uppercase tracking-tighter">0 MB of 5000 MB</span>
+                    </div>
+                    <div class="w-full bg-pink-50 h-3 rounded-full overflow-hidden border border-pink-100/50">
+                        <div id="global-storage-bar" class="bg-pink-400 h-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="showToast('GitHub Repository Linked!')" class="flex items-center gap-2 px-4 py-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition active:scale-90 text-sm font-bold text-gray-500">
+                    <img src="https://api.iconify.design/solar/code-bold.svg" class="w-5 h-5 text-gray-400" />
+                    Deploy
+                </button>
+                <button onclick="showToast('App Settings')" class="p-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition active:scale-90">
+                    <img src="https://api.iconify.design/solar/settings-bold.svg" class="w-5 h-5 text-gray-400" />
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Floating Action Button -->
+    <button onclick="openAddModal()" class="fixed bottom-8 right-8 w-16 h-16 bg-pink-500 rounded-2xl shadow-2xl flex items-center justify-center floating-btn z-50 hover:bg-pink-600 transition active:scale-95">
+        <img src="https://api.iconify.design/solar/add-folder-bold.svg?color=white" class="w-8 h-8" />
+    </button>
+
+    <!-- MODALS -->
+    
+    <!-- Add New Subject Modal -->
+    <div id="add-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="absolute inset-0 modal-overlay" onclick="closeAddModal()"></div>
+        <div class="bg-white rounded-[3rem] p-8 w-full max-w-md relative z-10 shadow-2xl border border-pink-50 scale-95 transition-transform">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">New Subject</h3>
+            <input type="text" id="new-subject-name" placeholder="Enter subject name..." class="w-full p-4 bg-pink-50 rounded-2xl border-none focus:ring-2 focus:ring-pink-300 mb-6 outline-none font-semibold">
+            <div class="flex gap-4">
+                <button onclick="closeAddModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition">Cancel</button>
+                <button onclick="addNewSubject()" class="flex-1 py-4 bg-pink-500 text-white rounded-2xl font-bold hover:bg-pink-600 transition shadow-lg shadow-pink-100">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Type Selection Modal -->
+    <div id="upload-selector-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="absolute inset-0 modal-overlay" onclick="closeUploadSelector()"></div>
+        <div class="bg-white rounded-[3rem] p-8 w-full max-w-md relative z-10 shadow-2xl border border-pink-50 scale-95 transition-transform">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">Select Type</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="triggerFileInput('image/*')" class="p-6 rounded-3xl bg-blue-50 text-blue-700 font-bold border border-blue-100 hover:bg-blue-100 transition flex flex-col items-center gap-2">
+                    <img src="https://api.iconify.design/solar/gallery-bold.svg?color=%231d4ed8" class="w-8 h-8" />Images
+                </button>
+                <button onclick="triggerFileInput('*/*')" class="p-6 rounded-3xl bg-green-50 text-green-700 font-bold border border-green-100 hover:bg-green-100 transition flex flex-col items-center gap-2">
+                    <img src="https://api.iconify.design/solar/document-text-bold.svg?color=%2315803d" class="w-8 h-8" />Files
+                </button>
+                <button onclick="triggerFileInput('video/*')" class="p-6 rounded-3xl bg-purple-50 text-purple-700 font-bold border border-purple-100 hover:bg-purple-100 transition flex flex-col items-center gap-2">
+                    <img src="https://api.iconify.design/solar/videocamera-record-bold.svg?color=%237e22ce" class="w-8 h-8" />Videos
+                </button>
+                <button onclick="triggerFileInput('audio/*')" class="p-6 rounded-3xl bg-orange-50 text-orange-700 font-bold border border-orange-100 hover:bg-orange-100 transition flex flex-col items-center gap-2">
+                    <img src="https://api.iconify.design/solar/microphone-3-bold.svg?color=%23c2410c" class="w-8 h-8" />Voices
+                </button>
+            </div>
+            <button onclick="closeUploadSelector()" class="w-full mt-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div id="rename-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="absolute inset-0 modal-overlay" onclick="closeRenameModal()"></div>
+        <div class="bg-white rounded-[3rem] p-8 w-full max-w-md relative z-10 shadow-2xl border border-pink-50 scale-95 transition-transform">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">Rename File</h3>
+            <input type="text" id="rename-input" class="w-full p-4 bg-pink-50 rounded-2xl border-none focus:ring-2 focus:ring-pink-300 mb-6 outline-none font-semibold">
+            <div class="flex gap-4">
+                <button onclick="closeRenameModal()" class="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition">Cancel</button>
+                <button onclick="saveRename()" class="flex-1 py-4 bg-pink-500 text-white rounded-2xl font-bold hover:bg-pink-600 transition shadow-lg shadow-pink-100">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Peek Preview Modal -->
+    <div id="peek-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="absolute inset-0 modal-overlay" onclick="closePeekModal()"></div>
+        <div class="bg-white rounded-[3rem] w-full max-w-2xl relative z-10 shadow-2xl border border-pink-50 scale-95 transition-transform overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center p-6 border-b border-pink-50">
+                <h3 id="peek-title" class="text-xl font-bold text-gray-800 truncate">File Preview</h3>
+                <button onclick="closePeekModal()" class="p-2 hover:bg-pink-50 rounded-xl transition">
+                    <img src="https://api.iconify.design/solar/close-circle-bold.svg" class="w-6 h-6 text-pink-300" />
+                </button>
+            </div>
+            <div id="peek-content" class="p-6 overflow-y-auto scrollbar-hide flex flex-col items-center justify-center min-h-[300px]">
+                <!-- Dynamic Preview Content -->
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-32 left-1/2 -translate-x-1/2 z-[200] pointer-events-none text-center flex flex-col gap-2 items-center w-full max-w-xs"></div>
+
+    <script>
+        /**
+         * App State
+         */
+        const MAX_STORAGE_MB = 5000;
+        var subjects = [
+            { id: 1, name: 'English', color: 'bg-[#FFCFDF]', icon: 'solar:pen-new-square-bold', files: [], used: 0 },
+            { id: 2, name: 'Math', color: 'bg-[#D0EBFF]', icon: 'solar:calculator-minimalistic-bold', files: [], used: 0 },
+            { id: 3, name: 'Physics', color: 'bg-[#E2F0CB]', icon: 'solar:atom-bold', files: [], used: 0 },
+            { id: 4, name: 'Computer', color: 'bg-[#E5DBFF]', icon: 'solar:laptop-bold', files: [], used: 0 },
+            { id: 5, name: 'Urdu', color: 'bg-[#FFF4B3]', icon: 'solar:book-bookmark-bold', files: [], used: 0 },
+            { id: 6, name: 'Isl', color: 'bg-[#D2F5F0]', icon: 'solar:moon-bold', files: [], used: 0 },
+            { id: 7, name: 'T.Q', color: 'bg-[#FFE2D1]', icon: 'solar:star-bold', files: [], used: 0 }
+        ];
+
+        var currentFolderId = null;
+        var currentFilter = 'All';
+        var renameFileId = null;
+
+        /**
+         * Initial Render
+         */
+        function init() {
+            renderFolders();
+            updateGlobalStorage();
+        }
+
+        /**
+         * Render Dashboard Folders
+         */
+        function renderFolders() {
+            const container = document.getElementById('folder-container');
+            container.innerHTML = '';
+            document.getElementById('folder-count-badge').innerText = `${subjects.length} Folders`;
+
+            subjects.forEach(sub => {
+                const card = document.createElement('div');
+                card.className = `folder-card ${sub.color} p-8 rounded-[2.5rem] shadow-sm flex flex-col gap-6 relative overflow-hidden`;
+                card.onclick = () => openFolder(sub.id);
+                
+                // Calculate individual folder usage percentage
+                const usagePercent = Math.min((sub.used / (MAX_STORAGE_MB / 10)) * 100, 100); // Visual indicator: 1/10th of global is a 'lot' for a subject folder visually
+                
+                card.innerHTML = `
+                    <div class="w-14 h-14 bg-white/60 backdrop-blur-md rounded-[1.25rem] flex items-center justify-center shadow-sm relative z-10">
+                        <img src="https://api.iconify.design/${sub.icon.replace(':', '/')}.svg" class="w-7 h-7" />
+                    </div>
+                    <div class="relative z-10">
+                        <h4 class="text-xl font-bold text-gray-800">${sub.name}</h4>
+                        <p class="text-sm text-gray-600/60 font-medium">${sub.files.length} items • ${sub.used.toFixed(1)} MB</p>
+                        <div class="w-full bg-white/30 h-1.5 rounded-full mt-3 overflow-hidden">
+                            <div class="bg-white/80 h-full transition-all duration-700" style="width: ${Math.min((sub.used / 500) * 100, 100)}%"></div>
+                        </div>
+                    </div>
+                    <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/20 rounded-full blur-2xl"></div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        /**
+         * Global Storage Tracker Updates
+         */
+        function updateGlobalStorage() {
+            const totalUsed = subjects.reduce((acc, sub) => acc + sub.used, 0);
+            const bar = document.getElementById('global-storage-bar');
+            const text = document.getElementById('global-storage-text');
+            const percentage = Math.min((totalUsed / MAX_STORAGE_MB) * 100, 100);
+            
+            bar.style.width = `${percentage}%`;
+            text.innerText = `${totalUsed.toFixed(1)} MB of ${MAX_STORAGE_MB} MB`;
+            
+            if (percentage > 90) bar.classList.replace('bg-pink-400', 'bg-red-400');
+            else bar.classList.replace('bg-red-400', 'bg-pink-400');
+        }
+
+        /**
+         * Folder Navigation
+         */
+        function openFolder(id) {
+            currentFolderId = id;
+            currentFilter = 'All';
+            const folder = subjects.find(s => s.id === id);
+            
+            document.getElementById('subjects-grid').classList.add('hidden');
+            const preview = document.getElementById('file-preview-section');
+            preview.classList.remove('hidden');
+            
+            document.getElementById('active-folder-title').innerText = folder.name;
+            document.getElementById('active-folder-usage').innerText = `${folder.used.toFixed(2)} MB stored`;
+            
+            updateFilterUI();
+            updateActivityList();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function closeFolder() {
+            currentFolderId = null;
+            document.getElementById('subjects-grid').classList.remove('hidden');
+            document.getElementById('file-preview-section').classList.add('hidden');
+            renderFolders();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        /**
+         * File Handling (Real Upload Simulator)
+         */
+        function openUploadSelector() {
+            document.getElementById('upload-selector-modal').classList.remove('hidden');
+        }
+
+        function closeUploadSelector() {
+            document.getElementById('upload-selector-modal').classList.add('hidden');
+        }
+
+        function triggerFileInput(accept) {
+            const input = document.getElementById('real-file-input');
+            input.accept = accept;
+            input.click();
+        }
+
+        function handleFileSelection(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const folder = subjects.find(s => s.id === currentFolderId);
+            const fileSizeMB = parseFloat((file.size / (1024 * 1024)).toFixed(2));
+
+            // Storage Limit Check
+            const totalUsed = subjects.reduce((acc, sub) => acc + sub.used, 0);
+            if (totalUsed + fileSizeMB > MAX_STORAGE_MB) {
+                showToast('Storage limit reached! (5GB Max)');
+                closeUploadSelector();
+                return;
+            }
+
+            let fileType = 'Files';
+            if (file.type.startsWith('image/')) fileType = 'Images';
+            if (file.type.startsWith('video/')) fileType = 'Videos';
+            if (file.type.startsWith('audio/')) fileType = 'Voices';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const newFile = {
+                    id: Date.now(),
+                    name: file.name,
+                    type: fileType,
+                    size: fileSizeMB,
+                    dataUrl: e.target.result,
+                    date: 'Added ' + new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                };
+
+                folder.files.push(newFile);
+                folder.used += fileSizeMB;
+                
+                updateGlobalStorage();
+                updateActivityList();
+                document.getElementById('active-folder-usage').innerText = `${folder.used.toFixed(2)} MB stored`;
+                
+                closeUploadSelector();
+                showToast(`Saved to ${folder.name}`);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * File Operations: Rename & Delete
+         */
+        function openRenameModal(fileId, oldName) {
+            renameFileId = fileId;
+            document.getElementById('rename-input').value = oldName;
+            document.getElementById('rename-modal').classList.remove('hidden');
+        }
+
+        function closeRenameModal() {
+            document.getElementById('rename-modal').classList.add('hidden');
+        }
+
+        function saveRename() {
+            const newName = document.getElementById('rename-input').value;
+            if (!newName) return;
+
+            const folder = subjects.find(s => s.id === currentFolderId);
+            const file = folder.files.find(f => f.id === renameFileId);
+            if (file) {
+                file.name = newName;
+                showToast('Name updated');
+                updateActivityList();
+            }
+            closeRenameModal();
+        }
+
+        function deleteFile(id) {
+            const folder = subjects.find(s => s.id === currentFolderId);
+            const fileIndex = folder.files.findIndex(f => f.id === id);
+            if (fileIndex > -1) {
+                const file = folder.files[fileIndex];
+                folder.used -= file.size;
+                folder.files.splice(fileIndex, 1);
+                
+                updateGlobalStorage();
+                updateActivityList();
+                document.getElementById('active-folder-usage').innerText = `${folder.used.toFixed(2)} MB stored`;
+                showToast('File removed');
+            }
+        }
+
+        /**
+         * Preview Logic
+         */
+        function openPeekModal(fileId) {
+            const folder = subjects.find(s => s.id === currentFolderId);
+            const file = folder.files.find(f => f.id === fileId);
+            const content = document.getElementById('peek-content');
+            
+            document.getElementById('peek-title').innerText = file.name;
+
+            if (file.type === 'Images') {
+                content.innerHTML = `<img src="${file.dataUrl}" class="rounded-3xl shadow-xl max-h-[60vh] object-contain w-full">`;
+            } else if (file.type === 'Videos') {
+                content.innerHTML = `<video controls src="${file.dataUrl}" class="w-full aspect-video rounded-3xl shadow-xl bg-black"></video>`;
+            } else if (file.type === 'Voices') {
+                content.innerHTML = `
+                    <div class="p-12 bg-pink-50 rounded-[3rem] w-full flex flex-col items-center gap-6">
+                        <img src="https://api.iconify.design/solar/microphone-large-bold.svg?color=%23ec4899" class="w-24 h-24">
+                        <audio controls src="${file.dataUrl}" class="w-full"></audio>
+                    </div>`;
+            } else {
+                content.innerHTML = `
+                    <div class="bg-gray-50 p-12 rounded-[3rem] w-full border-2 border-dashed border-gray-200 flex flex-col items-center gap-4 text-center">
+                        <img src="https://api.iconify.design/solar/document-text-bold-duotone.svg?color=%23f9a8d4" class="w-24 h-24">
+                        <p class="text-gray-600 font-bold text-lg">${file.name}</p>
+                        <p class="text-gray-400">This document type is secured and encrypted.</p>
+                    </div>`;
+            }
+            document.getElementById('peek-modal').classList.remove('hidden');
+        }
+
+        function closePeekModal() {
+            document.getElementById('peek-modal').classList.add('hidden');
+            document.getElementById('peek-content').innerHTML = '';
+        }
+
+        /**
+         * Folder Management
+         */
+        function openAddModal() {
+            document.getElementById('add-modal').classList.remove('hidden');
+        }
+
+        function closeAddModal() {
+            document.getElementById('add-modal').classList.add('hidden');
+        }
+
+        function addNewSubject() {
+            const name = document.getElementById('new-subject-name').value;
+            if (!name) return;
+            
+            const colors = ['bg-[#FFCFDF]', 'bg-[#D0EBFF]', 'bg-[#E2F0CB]', 'bg-[#E5DBFF]', 'bg-[#FFF4B3]'];
+            const newSub = {
+                id: Date.now(),
+                name: name,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                icon: 'solar:folder-bold',
+                files: [],
+                used: 0
+            };
+            subjects.push(newSub);
+            renderFolders();
+            closeAddModal();
+            showToast(`Folder "${name}" created`);
+        }
+
+        function deleteActiveFolder() {
+            if (confirm('Permanently delete this folder and all contents?')) {
+                subjects = subjects.filter(s => s.id !== currentFolderId);
+                closeFolder();
+                showToast('Folder deleted');
+            }
+        }
+
+        /**
+         * UI List Updates
+         */
+        function updateActivityList() {
+            const list = document.getElementById('activity-list');
+            const folder = subjects.find(s => s.id === currentFolderId);
+            
+            let filteredFiles = folder.files;
+            if (currentFilter !== 'All') {
+                filteredFiles = folder.files.filter(f => f.type === currentFilter);
+            }
+
+            if (filteredFiles.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-24">
+                        <img src="https://api.iconify.design/solar/cloud-upload-bold-duotone.svg?color=%23f9a8d4" class="w-24 h-24 mx-auto mb-4 opacity-30 animate-pulse" />
+                        <p class="text-pink-300 font-bold text-lg">Your vault is empty</p>
+                        <p class="text-pink-200 text-sm">Click Add Media to start saving files</p>
+                    </div>`;
+            } else {
+                list.innerHTML = '';
+                filteredFiles.slice().reverse().forEach(file => {
+                    const div = document.createElement('div');
+                    div.className = 'file-row flex items-center justify-between p-5 bg-pink-50/30 rounded-3xl hover:bg-white hover:shadow-sm transition border border-transparent hover:border-pink-50 group';
+                    
+                    const iconMap = {
+                        'Images': 'solar:gallery-bold',
+                        'Files': 'solar:document-text-bold',
+                        'Videos': 'solar:videocamera-record-bold',
+                        'Voices': 'solar:microphone-3-bold'
+                    };
+                    const icon = iconMap[file.type] || 'solar:document-bold';
+
+                    div.innerHTML = `
+                        <div class="flex items-center gap-4 min-w-0">
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                                <img src="https://api.iconify.design/${icon.replace(':','/')}.svg?color=%23f9a8d4" class="w-6 h-6" />
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <p class="font-bold text-sm text-gray-800 truncate">${file.name}</p>
+                                    <button onclick="openRenameModal(${file.id}, '${file.name.replace(/'/g, "\\'")}')" class="p-1 opacity-0 group-hover:opacity-100 hover:bg-white rounded-lg transition">
+                                        <img src="https://api.iconify.design/solar/pen-2-bold.svg?color=%23f9a8d4" class="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-gray-400 font-bold">${file.date} • ${file.size.toFixed(2)} MB</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button onclick="openPeekModal(${file.id})" class="p-2.5 bg-white rounded-xl shadow-sm hover:scale-110 transition">
+                                <img src="https://api.iconify.design/solar/eye-bold.svg?color=%23ec4899" class="w-5 h-5" />
+                            </button>
+                            <button onclick="deleteFile(${file.id})" class="p-2.5 hover:bg-red-50 rounded-xl transition">
+                                <img src="https://api.iconify.design/solar/trash-bin-minimalistic-bold.svg?color=%23f87171" class="w-5 h-5" />
+                            </button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            updateFilterUI();
+            updateActivityList();
+            showToast(`Viewing ${filter}`);
+        }
+
+        function updateFilterUI() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-pink-400', 'bg-pink-50', 'border-pink-200');
+                btn.classList.add('bg-white', 'border-gray-100');
+            });
+            const activeBtn = document.getElementById(`filter-${currentFilter}`);
+            if (activeBtn) {
+                activeBtn.classList.add('ring-2', 'ring-pink-400', 'bg-pink-50', 'border-pink-200');
+                activeBtn.classList.remove('bg-white', 'border-gray-100');
+            }
+        }
+
+        /**
+         * Toast System
+         */
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast bg-gray-900/90 text-white px-6 py-4 rounded-[2rem] text-sm font-bold backdrop-blur-md shadow-2xl flex items-center gap-3 border border-white/10';
+            toast.innerHTML = `<span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 50);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Init Application
+        window.onload = init;
+    </script>
+</body>
+</html>
